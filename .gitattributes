@@ -1,0 +1,2 @@
+# Preserve source OBJ bytes and keep generated asset removals reviewable.
+*.obj binary

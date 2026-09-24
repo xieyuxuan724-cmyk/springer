@@ -1,0 +1,51 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/.vinext/
+/out/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local environment
+.env*
+
+# deployment and generated files
+.vercel
+next-env.d.ts
+/dist/
+/.wrangler/
+/outputs/
+/work/
+*.tsbuildinfo
+*.log
+
+# Runtime binaries copied from locked npm dependencies by prebuild/predev
+/public/runtime/
+
+# Generated from canonical assets/ and the training actuator configuration.
+/public/robot/
+/public/policies/
+/public/favicon.svg
+/game/robot-config.json
+
+/.generated/

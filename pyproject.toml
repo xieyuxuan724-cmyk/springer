@@ -1,0 +1,57 @@
+# Copyright (c) 2026 Open Beni
+# SPDX-License-Identifier: MIT
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[project]
+name = "beni-mjlab"
+version = "0.1.0"
+description = "BENI wheel-legged robot velocity-flat training on mjlab (MuJoCo-Warp)"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+  "mjlab>=1.6.0",
+  "torch>=2.7,<2.8",
+]
+
+[project.scripts]
+play = "beni_rl.play:main"
+
+[project.entry-points."mjlab.tasks"]
+beni_rl = "beni_rl"
+
+[dependency-groups]
+dev = [
+  "onnxruntime>=1.19.0",
+]
+export = [
+  "MNN==3.5.0",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com/"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+warp-lang = { index = "nvidia" }
+torch = { index = "pytorch-cu128" }
+
+[tool.uv.build-backend]
+module-root = "python"
+module-name = "beni_rl"
+
+[tool.ruff]
+src = ["python"]
+line-length = 120

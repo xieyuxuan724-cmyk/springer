@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OpenBeni · Multiplayer Demo</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        height: 100vh;
+        margin: 0;
+        background: #152530;
+        color: #f2f6f3;
+        font-family: Inter, system-ui, sans-serif;
+        overflow: hidden;
+      }
+      #scene {
+        position: absolute;
+        inset: 0;
+      }
+      header {
+        position: absolute;
+        top: 18px;
+        left: 22px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        pointer-events: none;
+        text-shadow: 0 1px 5px #0009;
+      }
+      h1 {
+        font-size: 18px;
+        letter-spacing: -0.6px;
+        margin: 0;
+      }
+      h1 b {
+        color: #d9ff75;
+      }
+      header small {
+        font-size: 12px;
+        color: #f2f6f3;
+        letter-spacing: 0;
+      }
+      header > div {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      aside {
+        position: absolute;
+        right: 22px;
+        top: 16px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        background: #152024c9;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+      #clock {
+        font-size: 13px;
+        color: #c4d3cb;
+      }
+      #countdown {
+        position: absolute;
+        top: 42%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 90px;
+        font-weight: 700;
+        text-shadow: 0 4px 24px #0008;
+      }
+      #loading {
+        position: absolute;
+        inset: 0;
+        background: #152530;
+        display: grid;
+        place-content: center;
+        font-size: 20px;
+      }
+      #finish {
+        display: none;
+        position: absolute;
+        top: 45%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #152024e8;
+        padding: 18px 28px;
+        border-radius: 10px;
+        text-align: center;
+      }
+      #finish h2 {
+        font-size: 22px;
+        margin: 0;
+      }
+      #finish small,
+      #finish p,
+      .pill,
+      footer,
+      #event,
+      #board,
+      aside > .eyebrow,
+      #phase {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="scene"></div>
+    <header>
+      <div>
+        <h1>Open<b>Beni</b></h1>
+        <small id="course-name"></small>
+      </div>
+      <div class="pill">
+        <span class="dot">●</span>6 simulated drivers · Real WebSocket multiplayer
+      </div>
+    </header>
+    <aside>
+      <span id="race-position"></span><span id="race-lap"></span
+      ><span id="race-score"></span>
+      <div class="eyebrow">LIVE STANDINGS</div>
+      <div id="board"></div>
+      <div id="clock">00:00.0</div>
+      <small id="phase">Waiting to start</small>
+    </aside>
+    <div id="countdown"></div>
+    <div id="finish">
+      <small>RACE COMPLETE</small>
+      <h2 id="winner"></h2>
+      <p>Two laps · Six finishers in one room</p>
+    </div>
+    <div id="event">Connecting to the demo room</div>
+    <footer>
+      <div>
+        <div class="eyebrow">TOY HARBOR / GEM RACE / 2 LAPS</div>
+        <div class="title">One robot, six personalities.</div>
+        <div class="detail">Random skins · Bumps and pits · Gem scores · Random boosts</div>
+      </div>
+    </footer>
+    <div id="loading">Loading original robot and course…</div>
+    <script type="module" src="/tools/demo-recorder/client.ts"></script>
+  </body>
+</html>

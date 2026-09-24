@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+logs/
+outputs/
+runs/
+.omx/
+/tests/
+/web/tests/
+/docs/
+/AGENTS.md
+/MEMORY.md
+/:memory:.ses
+/assets/motions/README.md
+/assets/motions/recovery_initial_states_screening.npz
+/tmp/
+
+# Root-level deployment exports must not enter the source repository.
+/dist/

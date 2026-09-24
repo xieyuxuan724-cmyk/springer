@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2026 Open Beni
+     SPDX-License-Identifier: MIT -->
+<robot name="beni">
+  <mujoco>
+    <compiler meshdir="../meshes/" balanceinertia="true" discardvisual="false" fusestatic="false"/>
+  </mujoco>
+  <material name="mat_beni">
+    <color rgba="1 1 1 1"/>
+    <texture filename="../textures/beni_white.png"/>
+  </material>
+  <!-- Visual origins place the unmodified Y-up OBJ exports in each link's frame.
+       The source pose has base z=0.11 m, L1/R1=0.3 rad and L2/R2=0.5 rad. -->
+  <!-- Collision uses coarse exterior boxes and cylinders; no internal CAD meshes. -->
+  <link name="root_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1e-9"/>
+      <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+    </inertial>
+  </link>
+  <joint name="root_to_base_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="root_link"/>
+    <child link="base_link"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+  <link name="base_link">
+    <inertial>
+      <origin xyz="-0.026830109 -0.00097765393 -0.0006967038800000001" rpy="0 0 0"/>
+      <mass value="0.60837039"/>
+      <inertia ixx="0.0005842953" ixy="4.5142416e-5" ixz="-1.617345e-5" iyy="0.0017198711" iyz="2.7632628e-6" izz="0.0016573369"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.11" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <mesh filename="../meshes/VIS_base_link_00_BASE_VIS.obj"/>
+      </geometry>
+      <material name="mat_beni"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.005 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.15 0.08 0.07"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="head_intermediate">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1e-9"/>
+      <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+    </inertial>
+  </link>
+  <joint name="head_yaw_joint" type="revolute">
+    <origin xyz="-0.000 0 0.0" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="head_intermediate"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-5.20" upper="5.20" effort="0.1" velocity="400.0"/>
+  </joint>
+  <link name="head">
+    <inertial>
+      <origin xyz="0.0057515429 -3.3763401999999995e-5 0.030715793999999998" rpy="0 0 0"/>
+      <mass value="0.22713973"/>
+      <inertia ixx="0.00021585924" ixy="-1.4175017000000002e-7" ixz="-8.913237299999999e-7" iyy="0.00023532522" iyz="1.6379191e-7" izz="0.00035076542"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.1469" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <mesh filename="../meshes/VIS_head_00_HEAD_VIS.obj"/>
+      </geometry>
+      <material name="mat_beni"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.045" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.11 0.12 0.07"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="head_roll_joint" type="revolute">
+    <origin xyz="0 0 0.0369" rpy="0 0 0"/>
+    <parent link="head_intermediate"/>
+    <child link="head"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-0.05" upper="0.05" effort="1000.0" velocity="1000.0"/>
+  </joint>
+  <link name="L1_Link">
+    <inertial>
+      <origin xyz="-0.008230681600000001 -0.005782016300000001 0.0008501348800000001" rpy="0 0 0"/>
+      <mass value="0.26100817"/>
+      <inertia ixx="0.00010581644" ixy="3.2467542e-5" ixz="6.1594071e-6" iyy="0.00016271403000000002" iyz="-1.2252857e-5" izz="0.00018314794"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.0325072227328 -0.048 -0.105087013804" rpy="1.57079632679 0.3 0"/>
+      <geometry>
+        <mesh filename="../meshes/VIS_L1_Link_00_L1_VIS.obj"/>
+      </geometry>
+      <material name="mat_beni"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.03 0.02 0.005" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.13 0.03 0.05"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="L1" type="revolute">
+    <origin xyz="0 0.048 0" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="L1_Link"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-2.5307" upper="6.8940" effort="1.375" velocity="209"/>
+  </joint>
+  <link name="L2_Link">
+    <inertial>
+      <origin xyz="0.00016609656 0.005196929800000001 -0.062290377999999993" rpy="0 0 0"/>
+      <mass value="0.08287119"/>
+      <inertia ixx="7.0858589e-5" ixy="9.7216964e-8" ixz="-5.991245400000001e-7" iyy="7.582624900000001e-5" iyz="8.7535112e-6" izz="1.3020969e-5"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.0174783906666 -0.072 -0.110197525731" rpy="1.57079632679 0.8 0"/>
+      <geometry>
+        <mesh filename="../meshes/VIS_L2_Link_00_L1_VIS.obj"/>
+      </geometry>
+      <material name="mat_beni"/>
+    </visual>
+    <collision>
+      <origin xyz="0.00 -0.0035 -0.035" rpy="0 -0.0 0"/>
+      <geometry>
+        <box size="0.015 0.01 0.065"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0 -0.075" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder radius="0.025" length="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="L2" type="revolute">
+    <origin xyz="-0.07 0.024 0" rpy="0 0 0"/>
+    <parent link="L1_Link"/>
+    <child link="L2_Link"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-0.7853981633974483" upper="1.1344640137963142" effort="3.6" velocity="149"/>
+  </joint>
+  <link name="LW_Link">
+    <inertial>
+      <origin xyz="2.2944408999999998e-5 0.01067511 0.00017766532" rpy="0 0 0"/>
+      <mass value="0.076978199"/>
+      <inertia ixx="2.4617683e-5" ixy="-1.6383694e-8" ixz="7.8264342e-9" iyy="3.9531034e-5" iyz="-1.4443679000000002e-7" izz="2.4625466e-5"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.0174783906667 -0.08 -0.0351975257305" rpy="1.57079632679 0.8 0"/>
+      <geometry>
+        <mesh filename="../meshes/VIS_LW_Link_00_LW_VIS.obj"/>
+      </geometry>
+      <material name="mat_beni"/>
+    </visual>
+    <collision>
+      <origin rpy="1.5707963267948966 0 0" xyz="0 0.013 0"/>
+      <geometry>
+        <cylinder length="0.021" radius="0.038"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="LW" type="continuous">
+    <origin xyz="0 0.008 -0.075" rpy="0 0 0"/>
+    <parent link="L2_Link"/>
+    <child link="LW_Link"/>
+    <axis xyz="0 -1 0"/>
+    <limit effort="0.6" velocity="400"/>
+  </joint>
+  <link name="R1_Link">
+    <inertial>
+      <origin xyz="-0.008230681600000001 0.005782016300000001 0.0008501348800000001" rpy="0 0 0"/>
+      <mass value="0.26100817"/>
+      <inertia ixx="0.00010581644" ixy="-3.2467542e-5" ixz="6.1594071e-6" iyy="0.00016271403000000002" iyz="1.2252857e-5" izz="0.00018314794"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.0325072227328 0.048 -0.105087013804" rpy="1.57079632679 0.3 0"/>
+      <geometry>
+        <mesh filename="../meshes/VIS_R1_Link_00_R1_VIS.obj"/>
+      </geometry>
+      <material name="mat_beni"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.03 -0.02 0.005" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.13 0.03 0.05"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="R1" type="revolute">
+    <origin xyz="0 -0.048 0" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="R1_Link"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-2.5307" upper="6.8940" effort="1.375" velocity="209"/>
+  </joint>
+  <link name="R2_Link">
+    <inertial>
+      <origin xyz="0.00016609656 -0.005196929800000001 -0.062290377999999993" rpy="0 0 0"/>
+      <mass value="0.08287119"/>
+      <inertia ixx="7.0858589e-5" ixy="-9.7216964e-8" ixz="-5.991245400000001e-7" iyy="7.582624900000001e-5" iyz="-8.7535112e-6" izz="1.3020969e-5"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.0174783906666 0.072 -0.110197525731" rpy="1.57079632679 0.8 0"/>
+      <geometry>
+        <mesh filename="../meshes/VIS_R2_Link_00_R2_VIS.obj"/>
+      </geometry>
+      <material name="mat_beni"/>
+    </visual>
+    <collision>
+      <origin xyz="0.00 0.0035 -0.035" rpy="0 -0.0 0"/>
+      <geometry>
+        <box size="0.015 0.01 0.065"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0 -0.075" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder radius="0.025" length="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="R2" type="revolute">
+    <origin xyz="-0.07 -0.024 0" rpy="0 0 0"/>
+    <parent link="R1_Link"/>
+    <child link="R2_Link"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-0.7853981633974483" upper="1.1344640137963142" effort="3.6" velocity="149"/>
+  </joint>
+  <link name="RW_Link">
+    <inertial>
+      <origin xyz="2.2944408999999998e-5 -0.01067511 0.00017766532" rpy="0 0 0"/>
+      <mass value="0.076978199"/>
+      <inertia ixx="2.4617683e-5" ixy="1.6383694e-8" ixz="7.8264342e-9" iyy="3.9531034e-5" iyz="1.4443679000000002e-7" izz="2.4625466e-5"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.0174783906667 0.08 -0.0351975257305" rpy="1.57079632679 0.8 0"/>
+      <geometry>
+        <mesh filename="../meshes/VIS_RW_Link_00_RW_VIS.obj"/>
+      </geometry>
+      <material name="mat_beni"/>
+    </visual>
+    <collision>
+      <origin rpy="1.5707963267948966 0 0" xyz="0 -0.013 0"/>
+      <geometry>
+        <cylinder length="0.021" radius="0.038"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="RW" type="continuous">
+    <origin xyz="0 -0.008 -0.075" rpy="0 0 0"/>
+    <parent link="R2_Link"/>
+    <child link="RW_Link"/>
+    <axis xyz="0 -1 0"/>
+    <limit effort="0.6" velocity="400"/>
+  </joint>
+</robot>

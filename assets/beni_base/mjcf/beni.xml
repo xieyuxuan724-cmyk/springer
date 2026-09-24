@@ -1,0 +1,135 @@
+<!-- Copyright (c) 2026 Open Beni
+     SPDX-License-Identifier: MIT -->
+<mujoco model="beni">
+  <compiler angle="radian" meshdir="../meshes" texturedir="../textures"/>
+  <asset>
+    <!-- Textured visuals from beni/build/scene.xml. The RGB map includes baked AO and emissive. -->
+    <texture name="tex_beni" type="2d" file="beni_white.png"/>
+    <texture name="tex_beni_emissive" type="2d" file="tex_beni_emissive.png"/>
+    <texture name="tex_beni_normal" type="2d" file="tex_beni_normal.png"/>
+    <texture name="tex_beni_orm" type="2d" file="tex_beni_orm.png"/>
+    <material name="mat_beni" texuniform="false" specular="0.672" shininess="0.452">
+      <layer texture="tex_beni" role="rgb"/>
+      <layer texture="tex_beni_emissive" role="emissive"/>
+      <layer texture="tex_beni_normal" role="normal"/>
+      <layer texture="tex_beni_orm" role="orm"/>
+    </material>
+    <!-- OBJ vertices are in Y-up world coordinates at base z=0.11 m,
+         L1/R1=0.3 rad, L2/R2=0.5 rad. refpos/refquat undo that pose
+         into each link's local frame while preserving the source meshes and UVs. -->
+    <mesh name="BASE_VIS" file="VIS_base_link_00_BASE_VIS.obj" inertia="shell"
+          refpos="0 0.11 0" refquat="0.707106781187 -0.707106781187 0 0"/>
+    <mesh name="HEAD_VIS" file="VIS_head_00_HEAD_VIS.obj" inertia="shell"
+          refpos="0 0.1469 0" refquat="0.707106781187 -0.707106781187 0 0"/>
+    <mesh name="L1_VIS" file="VIS_L1_Link_00_L1_VIS.obj" inertia="shell"
+          refpos="0 0.11 -0.048" refquat="0.69916673425 -0.69916673425 -0.10566871684 0.10566871684"/>
+    <mesh name="L2_VIS" file="VIS_L2_Link_00_L1_VIS.obj" inertia="shell"
+          refpos="-0.0668735542388 0.0893135855337 -0.072" refquat="0.651288474746 -0.651288474746 -0.275360350565 0.275360350565"/>
+    <mesh name="LW_VIS" file="VIS_LW_Link_00_LW_VIS.obj" inertia="shell"
+          refpos="-0.0130718474213 0.0370605823327 -0.08" refquat="0.651288474746 -0.651288474746 -0.275360350565 0.275360350565"/>
+    <mesh name="R1_VIS" file="VIS_R1_Link_00_R1_VIS.obj" inertia="shell"
+          refpos="0 0.11 0.048" refquat="0.69916673425 -0.69916673425 -0.10566871684 0.10566871684"/>
+    <mesh name="R2_VIS" file="VIS_R2_Link_00_R2_VIS.obj" inertia="shell"
+          refpos="-0.0668735542388 0.0893135855337 0.072" refquat="0.651288474746 -0.651288474746 -0.275360350565 0.275360350565"/>
+    <mesh name="RW_VIS" file="VIS_RW_Link_00_RW_VIS.obj" inertia="shell"
+          refpos="-0.0130718474213 0.0370605823327 0.08" refquat="0.651288474746 -0.651288474746 -0.275360350565 0.275360350565"/>
+  </asset>
+  <worldbody>
+    <!-- Group 1: visible textured meshes. Group 3: collision primitives, hidden by default.
+         Collision uses coarse exterior boxes and cylinders; no internal CAD meshes. -->
+    <body name="base_link">
+      <joint name="root_joint" type="free"/>
+      <inertial pos="-0.026830109 -0.00097765393 -0.0006967038800000001" mass="0.60837039" fullinertia="0.0005842953 0.0017198711 0.0016573369 4.5142416e-5 -1.617345e-5 2.7632628e-6"/>
+      <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" material="mat_beni" mesh="BASE_VIS"/>
+      <geom name="base_collision" group="3" type="box" pos="-0.005 0 0" size="0.075 0.04 0.035"/>
+      <site name="imu_site" pos="0 0 0" size="0.01" rgba="0 1 0 0.5"/>
+      <!-- Match the 80x60 depth camera calibration: fy=31.875, cy=30. -->
+      <camera name="depth_front" pos="0.07 0.03 -0.016" quat="0.5 0.5 -0.5 -0.5" fovy="86.529"/>
+      <body name="head_intermediate" pos="-0.000 0 0.0">
+        <inertial pos="0 0 0" mass="1e-9" fullinertia="1e-9 1e-9 1e-9 0 0 0"/>
+        <joint name="head_yaw_joint" pos="0 0 0" axis="0 0 1" range="-5.20 5.20" actuatorfrcrange="-0.1 0.1" armature="0" frictionloss="0" damping="0"/>
+        <body name="head" pos="0 0 0.0369">
+          <inertial pos="0.0057515429 -3.3763401999999995e-5 0.030715793999999998" mass="0.22713973" fullinertia="0.00021585924 0.00023532522 0.00035076542 -1.4175017000000002e-7 -8.913237299999999e-7 1.6379191e-7"/>
+          <joint name="head_roll_joint" pos="0 0 0" axis="1 0 0" range="-0.05 0.05" actuatorfrcrange="-1000.0 1000.0" armature="0" frictionloss="0" damping="0"/>
+          <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" material="mat_beni" mesh="HEAD_VIS"/>
+          <geom name="head_collision" group="3" type="box" pos="0 0 0.045" size="0.055 0.06 0.035"/>
+          <site name="head_imu_site" pos="0 0 0" size="0.01" rgba="1 0 0 0.5"/>
+        </body>
+      </body>
+      <body name="L1_Link" pos="0 0.048 0">
+        <inertial pos="-0.008230681600000001 -0.005782016300000001 0.0008501348800000001" mass="0.26100817" fullinertia="0.00010581644 0.00016271403000000002 0.00018314794 3.2467542e-5 6.1594071e-6 -1.2252857e-5"/>
+        <joint name="L1" pos="0 0 0" axis="0 -1 0" ref="0.3" range="-2.5307 6.8940" actuatorfrcrange="-1.375 1.375" armature="0.00016253425" frictionloss="0.04" damping="0"/>
+        <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" material="mat_beni" mesh="L1_VIS"/>
+        <geom name="L1_collision" group="3" type="box" pos="-0.03 0.02 0.005" size="0.065 0.015 0.025"/>
+        <body name="L2_Link" pos="-0.07 0.024 0">
+          <inertial pos="0.00016609656 0.005196929800000001 -0.062290377999999993" mass="0.08287119" fullinertia="7.0858589e-5 7.582624900000001e-5 1.3020969e-5 9.7216964e-8 -5.991245400000001e-7 8.7535112e-6"/>
+          <joint name="L2" pos="0 0 0" axis="0 -1 0" ref="0.5" range="-0.7853981633974483 1.1344640137963142" actuatorfrcrange="-3.6 3.6" armature="0.00053748" frictionloss="0.04" damping="0"/>
+          <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" material="mat_beni" mesh="L2_VIS"/>
+          <geom group="3" pos="0.00 -0.0035 -0.035" type="box" size="0.0075 0.005 0.0325"/>
+          <geom name="L2_collision" group="3" type="cylinder" pos="0 0 -0.075"
+                quat="0.7071067811865476 0.7071067811865475 0 0" size="0.025 0.01"/>
+          <body name="LW_Link" pos="0 0.008 -0.075">
+            <inertial pos="2.2944408999999998e-5 0.01067511 0.00017766532" mass="0.076978199" fullinertia="2.4617683e-5 3.9531034e-5 2.4625466e-5 -1.6383694e-8 7.8264342e-9 -1.4443679000000002e-7"/>
+            <joint name="LW" pos="0 0 0" axis="0 -1 0" actuatorfrcrange="-0.6 0.6" armature="0" frictionloss="0.004" damping="0"/>
+            <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" material="mat_beni" mesh="LW_VIS"/>
+            <geom group="3" pos="0 0.013 0" quat="0.7071067811865476 0.7071067811865475 0 0" type="cylinder" size="0.038 0.0105"/>
+          </body>
+        </body>
+      </body>
+      <body name="R1_Link" pos="0 -0.048 0">
+        <inertial pos="-0.008230681600000001 0.005782016300000001 0.0008501348800000001" mass="0.26100817" fullinertia="0.00010581644 0.00016271403000000002 0.00018314794 -3.2467542e-5 6.1594071e-6 1.2252857e-5"/>
+        <joint name="R1" pos="0 0 0" axis="0 -1 0" ref="0.3" range="-2.5307 6.8940" actuatorfrcrange="-1.375 1.375" armature="0.00016253425" frictionloss="0.04" damping="0"/>
+        <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" material="mat_beni" mesh="R1_VIS"/>
+        <geom name="R1_collision" group="3" type="box" pos="-0.03 -0.02 0.005" size="0.065 0.015 0.025"/>
+        <body name="R2_Link" pos="-0.07 -0.024 0">
+          <inertial pos="0.00016609656 -0.005196929800000001 -0.062290377999999993" mass="0.08287119" fullinertia="7.0858589e-5 7.582624900000001e-5 1.3020969e-5 -9.7216964e-8 -5.991245400000001e-7 -8.7535112e-6"/>
+          <joint name="R2" pos="0 0 0" axis="0 -1 0" ref="0.5" range="-0.7853981633974483 1.1344640137963142" actuatorfrcrange="-3.6 3.6" armature="0.00053748" frictionloss="0.04" damping="0"/>
+          <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" material="mat_beni" mesh="R2_VIS"/>
+          <geom group="3" pos="0.00 0.0035 -0.035" type="box" size="0.0075 0.005 0.0325"/>
+          <geom name="R2_collision" group="3" type="cylinder" pos="0 0 -0.075"
+                quat="0.7071067811865476 0.7071067811865475 0 0" size="0.025 0.01"/>
+          <body name="RW_Link" pos="0 -0.008 -0.075">
+            <inertial pos="2.2944408999999998e-5 -0.01067511 0.00017766532" mass="0.076978199" fullinertia="2.4617683e-5 3.9531034e-5 2.4625466e-5 1.6383694e-8 7.8264342e-9 1.4443679000000002e-7"/>
+            <joint name="RW" pos="0 0 0" axis="0 -1 0" actuatorfrcrange="-0.6 0.6" armature="0" frictionloss="0.004" damping="0"/>
+            <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" material="mat_beni" mesh="RW_VIS"/>
+            <geom group="3" pos="0 -0.013 0" quat="0.7071067811865476 0.7071067811865475 0 0" type="cylinder" size="0.038 0.0105"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <position name="head_yaw_pos" joint="head_yaw_joint" kp="0.5" ctrlrange="-100000 100000" forcerange="-0.1 0.1"/>
+    <velocity name="head_yaw_vel" joint="head_yaw_joint" kv="0.02" ctrlrange="-100000 100000" forcerange="-0.1 0.1"/>
+    <motor name="head_yaw_tor" joint="head_yaw_joint" gear="1" ctrlrange="-0.1 0.1"/>
+    <position name="head_roll_pos" joint="head_roll_joint" kp="0.5" ctrlrange="-100000 100000" forcerange="-1000.0 1000.0"/>
+    <velocity name="head_roll_vel" joint="head_roll_joint" kv="0.02" ctrlrange="-100000 100000" forcerange="-1000.0 1000.0"/>
+    <motor name="head_roll_tor" joint="head_roll_joint" gear="1" ctrlrange="-1000.0 1000.0"/>
+    <position name="L1_pos" joint="L1" kp="0.5" ctrlrange="-100000 100000" forcerange="-1000.0 1000.0"/>
+    <velocity name="L1_vel" joint="L1" kv="0.02" ctrlrange="-100000 100000" forcerange="-1000.0 1000.0"/>
+    <motor name="L1_tor" joint="L1" gear="1" ctrlrange="-1.375 1.375"/>
+    <position name="L2_pos" joint="L2" kp="0.5" ctrlrange="-100000 100000" forcerange="-1000 1000"/>
+    <velocity name="L2_vel" joint="L2" kv="0.02" ctrlrange="-100000 100000" forcerange="-1000 1000"/>
+    <motor name="L2_tor" joint="L2" gear="1" ctrlrange="-3.6 3.6"/>
+    <!-- Wheel velocity actuator names must match the deployment controller. -->
+    <velocity name="LW" joint="LW" kv="0.004" ctrlrange="-100000 100000" forcerange="-1000 1000"/>
+    <motor name="LW_tor" joint="LW" gear="1" ctrlrange="-0.6 0.6"/>
+    <position name="R1_pos" joint="R1" kp="0.5" ctrlrange="-100000 100000" forcerange="-1000.0 1000.0"/>
+    <velocity name="R1_vel" joint="R1" kv="0.02" ctrlrange="-100000 100000" forcerange="-1000.0 1000.0"/>
+    <motor name="R1_tor" joint="R1" gear="1" ctrlrange="-1.375 1.375"/>
+    <position name="R2_pos" joint="R2" kp="0.5" ctrlrange="-100000 100000" forcerange="-1000 1000"/>
+    <velocity name="R2_vel" joint="R2" kv="0.02" ctrlrange="-100000 100000" forcerange="-1000 1000"/>
+    <motor name="R2_tor" joint="R2" gear="1" ctrlrange="-3.6 3.6"/>
+    <velocity name="RW" joint="RW" kv="0.004" ctrlrange="-100000 100000" forcerange="-1000 1000"/>
+    <motor name="RW_tor" joint="RW" gear="1" ctrlrange="-0.6 0.6"/>
+  </actuator>
+  <sensor>
+    <accelerometer name="imu_acc" site="imu_site"/>
+    <gyro name="imu_gyro" site="imu_site"/>
+    <framequat name="imu_quat" objtype="site" objname="imu_site"/>
+    <velocimeter name="base_vel" site="imu_site"/>
+    <accelerometer name="head_imu_acc" site="head_imu_site"/>
+    <gyro name="head_imu_gyro" site="head_imu_site"/>
+    <framequat name="head_imu_quat" objtype="site" objname="head_imu_site"/>
+  </sensor>
+</mujoco>
