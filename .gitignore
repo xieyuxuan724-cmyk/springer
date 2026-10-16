@@ -8,7 +8,6 @@ runs/
 .omx/
 /tests/
 /web/tests/
-/docs/
 /AGENTS.md
 /MEMORY.md
 /:memory:.ses
