@@ -8,7 +8,7 @@ import torch
 from tensordict import TensorDict
 from rsl_rl.env import VecEnv
 from rsl_rl.runners import OnPolicyRunner
-from .common import fingerprint
+from .common import fingerprint,Config
 from .metrics import training_metrics
 
 
@@ -19,10 +19,10 @@ def runner_config(seed,steps=64):
     for name in ('actor','critic'):
         cfg[name].update(class_name='MLPModel',hidden_dims=(128,128,64),activation='elu')
         for key in ('rnn_type','rnn_hidden_dim','rnn_num_layers','cnn_cfg'):cfg[name].pop(key,None)
-    cfg['actor']['distribution_cfg']['init_std']=.6
+    cfg['actor']['distribution_cfg'].update(init_std=.4,std_range=(.1,.6))
     cfg.update(seed=seed,num_steps_per_env=steps,save_interval=10,experiment_name='beni_avoidance',
                obs_groups={'actor':('actor',),'critic':('actor',)},logger='tensorboard')
-    cfg['algorithm'].update(learning_rate=3e-4,gamma=.995,entropy_coef=.01)
+    cfg['algorithm'].update(learning_rate=3e-4,gamma=.995,entropy_coef=.001)
     return cfg
 
 
@@ -32,7 +32,7 @@ class BudgetExpired(Exception):pass
 class Adapter(VecEnv):
     def __init__(self,env,steps,deadline=None,log=None):
         self.env=env;self.num_envs=env.n;self.device=env.device;self.num_actions=2
-        self.cfg=env.cfg.dict();self.max_episode_length=655
+        self.cfg=env.cfg.dict();self.max_episode_length=int(max(env.cfg.timeout_factor*env.cfg.target_distance/.1+env.cfg.timeout_extra,env.cfg.stop_timeout)/env.cfg.upper_dt)+5
         self.deadline=deadline;self.steps_per_iter=steps;self.total_steps=0
         self.log=log
     @property
@@ -47,6 +47,9 @@ class Adapter(VecEnv):
         self.total_steps+=1
         ids=done.nonzero().flatten()
         metrics=training_metrics(self.env,info,ids)
+        bounded=actions.tanh()
+        metrics['Exploration/saturation_vx']=(bounded[:,0].abs()>.95).float().clone()
+        metrics['Exploration/saturation_yaw']=(bounded[:,1].abs()>.95).float().clone()
         if len(ids):
             if self.log:
                 with Path(self.log).open('a') as f:
@@ -103,9 +106,10 @@ class Runner(OnPolicyRunner):
                 actor=Upper(path,'cpu',cfg.bottom)
                 reports=[]
                 for zero,episodes,seed in [(False,settings['episodes'],2_000_000),(True,settings['zero_episodes'],2_100_000)]:
+                    if episodes==0:continue
                     report=evaluate(validation_env,actor,episodes,seed,zero,deadline=deadline)
                     report.update(backend='native',policy=str(path),bottom_sha256=self.bottom_hash,
-                                  iteration=iteration,wall_seconds=time.monotonic()-started)
+                                  iteration=iteration,config=cfg.dict(),wall_seconds=time.monotonic()-started)
                     reports.append(report)
                 # Only emit complete validation rounds, never partial success rates.
                 for report in reports:
@@ -127,7 +131,8 @@ class Upper(torch.nn.Module):
         if bottom and fingerprint(bottom)!=self.metadata['bottom_sha256']:
             raise ValueError('Bottom policy fingerprint does not match training checkpoint')
         width=state['obs_normalizer._mean'].shape[1]
-        if width!=135:raise ValueError('Upper checkpoint must have 135 inputs')
+        cfg=Config.from_checkpoint(self.metadata['avoidance_config']);cfg.validate()
+        if width!=cfg.obs_dim:raise ValueError('Checkpoint observation width disagrees with its version')
         self.register_buffer('mean',state['obs_normalizer._mean'])
         self.register_buffer('std',state['obs_normalizer._std'])
         self.mlp=torch.nn.Sequential(torch.nn.Linear(width,128),torch.nn.ELU(),torch.nn.Linear(128,128),

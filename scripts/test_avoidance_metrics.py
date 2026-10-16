@@ -7,6 +7,7 @@ from pathlib import Path
 import torch
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 from beni_avoidance.env import AvoidanceEnv
+from beni_avoidance.common import Config
 from beni_avoidance.metrics import training_metrics,write_evaluation
 from beni_avoidance.training import Adapter,Runner,runner_config
 
@@ -15,7 +16,7 @@ class MetricsTests(unittest.TestCase):
     def setUp(self):torch.set_num_threads(1)
 
     def test_reward_preserved_and_partial_reset(self):
-        e=AvoidanceEnv(2)
+        e=AvoidanceEnv(2,cfg=Config(version=1))
         e.reset(seeds=[1,2],speeds=[.3,0.],count=0,directions=[0.,0.])
         for _ in range(7):
             x=e.state()[0][:,0].clone();before=e.command.clone()

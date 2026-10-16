@@ -143,17 +143,13 @@ def build_model(motors, world_builder=None):
     ET.SubElement(asset, 'material', name='floor_material', texture='floor_checker',
                   texuniform='true', texrepeat='2 2', reflectance='0', shininess='0')
     world = root.find('worldbody')
-    # Keep a finite visual patch centered near the robot; plane collision is infinite.
-    ET.SubElement(world, 'geom', name='floor', type='plane', size='20 20 .1',
+    # An infinite rendered plane keeps its checker texture fixed in world space.
+    ET.SubElement(world, 'geom', name='floor', type='plane', size='0 0 .1',
                   friction='1 .005 .0001', material='floor_material')
     ET.SubElement(world, 'light', pos='0 -2 3', dir='0 .5 -1', directional='true')
     if world_builder is not None:
         world_builder(world)
-    model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding='unicode'))
-    # The compiler optimizes an origin-centered plane as coincident with world.
-    # Disable that shortcut before changing its position at runtime.
-    model.geom_sameframe[model.geom('floor').id] = 0
-    return model
+    return mujoco.MjModel.from_xml_string(ET.tostring(root, encoding='unicode'))
 
 
 class Simulation:
@@ -168,15 +164,6 @@ class Simulation:
         self.wheels = [self.model.geom(n + '_collision').id for n in ('LW', 'RW')]
         self.weight = self.model.body_mass.sum() * 9.81
         self.reset()
-
-    def update_ground(self):
-        # Even an infinite plane is tessellated within the renderer's finite range.
-        # Recenter its origin by whole checker periods so colors stay world-aligned.
-        # Tangential translation leaves infinite-plane collision physics unchanged.
-        origin = np.floor(self.data.qpos[:2] / .5) * .5
-        floor = self.model.geom('floor')
-        floor.pos[:2] = origin
-
 
     def reset(self):
         mujoco.mj_resetData(self.model, self.data)
@@ -195,7 +182,6 @@ class Simulation:
         self.jump_vx = 0.
         self.body_contact = False
         self.max_height = .14
-        self.update_ground()
         mujoco.mj_forward(self.model, self.data)
 
     def measurement(self):
@@ -298,7 +284,6 @@ class Simulation:
             self.apply(action)
             mujoco.mj_step(self.model, self.data)
             self.body_contact |= self.measurement()['body']
-        self.update_ground()
         mujoco.mj_forward(self.model, self.data)
         if not np.isfinite(self.data.qpos).all() or not np.isfinite(self.data.qvel).all():
             raise RuntimeError('Nonfinite physics state')

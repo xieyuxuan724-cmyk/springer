@@ -35,6 +35,7 @@ def training_metrics(env, info, ids):
 def write_evaluation(writer,report,step):
     """Never mix train, validation, final test, zero-speed or backend series."""
     split='Validation' if 2_000_000<=report['seed_base']<3_000_000 else 'Test' if report['formal_protocol'] else 'Diagnostic'
+    if report.get('stress_test'):split='Stress'
     prefix=f'{split}/{report["backend"]}/{"zero" if report["zero_command_test"] else "navigation"}'
     values={'success_rate':report['success_rate'],'episodes':report['episodes'],
             'wall_seconds':report['wall_seconds']}

@@ -61,7 +61,7 @@ class AvoidanceTests(unittest.TestCase):
         for got,want in [(e.backend.qpos[1],q),(e.bottom.hidden[:,1],h),(e.motors.history[:,1],history),(e.frames[1],frames)]:
             torch.testing.assert_close(got,want,rtol=0,atol=0)
         self.assertEqual(float(e.bottom.hidden[:,0].abs().sum()),0.)
-        self.assertEqual(e.observation().shape,(2,135))
+        self.assertEqual(e.observation().shape,(2,self.env.cfg.obs_dim))
 
     def test_collision_latches_across_substeps(self):
         e=self.env;e.reset(seeds=[1,2],speeds=[0.,0.],count=0,directions=[0.,0.])

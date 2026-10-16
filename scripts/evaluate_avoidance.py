@@ -7,17 +7,18 @@ import torch
 from beni_avoidance.common import Config,fingerprint
 from beni_avoidance.env import AvoidanceEnv,rule_action
 from beni_avoidance.training import Upper
+from beni_avoidance.scene_cli import add_scene_arguments,apply_scene_arguments,standard_scene
 
 from beni_avoidance.metrics import REASONS,write_evaluation
 
 
-def evaluate(env,policy,episodes=100,seed_base=3_000_000,zero=False,deadline=None):
+def evaluate(env,policy,episodes=100,seed_base=3_000_000,zero=False,deadline=None,obstacles=None):
     records=[];slots={};next_episode=0
     def assign(slot,index):
         seed=seed_base+index
         speed=0. if zero else [.1,.3,.5][index%3]
         angle=float(np.random.default_rng(seed).uniform(-np.pi,np.pi))
-        count=3+seed%6
+        count=obstacles if obstacles is not None else 3+seed%(env.cfg.max_obstacles-2)
         env.reset([slot],seeds=[seed],speeds=[speed],count=count,directions=[angle])
         slots[slot]=dict(index=index,seed=seed,speed=speed,count=count)
     for slot in range(min(env.n,episodes)):assign(slot,next_episode);next_episode+=1
@@ -39,14 +40,15 @@ def evaluate(env,policy,episodes=100,seed_base=3_000_000,zero=False,deadline=Non
         # Finished slots are reset harmlessly; never allowed to diverge while other episodes finish.
         unused=[i for i in range(env.n) if i not in slots]
         if unused:env.reset(unused,seeds=[9_900_000+i for i in unused],speeds=[0.]*len(unused),count=0,directions=[0.]*len(unused))
+    standard=standard_scene(env.cfg) and obstacles is None
     records.sort(key=lambda r:r['index'])
     rate=sum(r['success'] for r in records)/episodes
     grouped={str(v):dict(episodes=sum(r['speed']==v for r in records),
         success_rate=float(np.mean([r['success'] for r in records if r['speed']==v])))
         for v in sorted(set(r['speed'] for r in records))}
-    return dict(episodes=episodes,seed_base=seed_base,zero_command_test=zero,success_rate=rate,
-                formal_protocol=episodes==100 and seed_base==3_000_000 and not zero,
-                acceptance_met=rate>=.9 if episodes==100 and seed_base==3_000_000 and not zero else None,
+    return dict(stress_test=not standard,obstacle_count_override=obstacles,episodes=episodes,seed_base=seed_base,zero_command_test=zero,success_rate=rate,
+                formal_protocol=standard and episodes==100 and seed_base==3_000_000 and not zero,
+                acceptance_met=rate>=.9 if standard and episodes==100 and seed_base==3_000_000 and not zero else None,
                 reason_counts={reason:sum(r['reason']==reason for r in records) for reason in REASONS.values()},
                 by_speed=grouped,records=records)
 
@@ -63,18 +65,23 @@ def main():
     p.add_argument('--tensorboard-dir',type=Path,help='Optional event directory; use one directory per evaluated policy/run')
     p.add_argument('--step',type=int,help='Training iteration; defaults to checkpoint iteration')
     p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--obstacles',type=int,help='Fixed obstacle count for pressure tests; otherwise seeded counts')
+    add_scene_arguments(p)
     a=p.parse_args();torch.set_num_threads(1)
     if a.episodes<1 or a.num_envs<1:p.error('Counts must be positive')
     cfg=Config()
     if a.policy:
         meta=torch.load(a.policy,map_location='cpu',weights_only=True)['infos']
-        cfg=Config(**meta['avoidance_config'])
+        cfg=Config.from_checkpoint(meta['avoidance_config'])
     if a.bottom:cfg.bottom=str(a.bottom.resolve())
+    try:changes=apply_scene_arguments(cfg,a)
+    except ValueError as exc:p.error(str(exc))
+    if a.obstacles is not None and not 0<=a.obstacles<=cfg.max_obstacles:p.error('Invalid obstacle count')
     e=AvoidanceEnv(min(a.num_envs,a.episodes),a.backend,cfg)
     actor=Upper(a.policy,e.device,cfg.bottom) if a.policy else None
-    start=time.monotonic();report=evaluate(e,actor,a.episodes,a.seed_base,a.zero)
+    start=time.monotonic();report=evaluate(e,actor,a.episodes,a.seed_base,a.zero,obstacles=a.obstacles)
     report.update(backend=a.backend,policy=str(a.policy) if a.policy else 'rule',bottom_sha256=fingerprint(cfg.bottom),
-                  config=cfg.dict(),wall_seconds=time.monotonic()-start)
+                  scene_overrides=changes,config=cfg.dict(),wall_seconds=time.monotonic()-start)
     a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(report,indent=2))
     if a.tensorboard_dir:
         from torch.utils.tensorboard import SummaryWriter

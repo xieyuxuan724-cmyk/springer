@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 from beni_avoidance.env import AvoidanceEnv,rule_action
 from beni_avoidance.common import Config
+from beni_avoidance.scene_cli import add_scene_arguments,apply_scene_arguments
 
 
 def main():
@@ -16,10 +17,15 @@ def main():
     p.add_argument('--speed',type=float,default=.3)
     p.add_argument('--yaw',type=float,default=None,help='Direct upper normalized yaw command for bottom tests')
     p.add_argument('--log',type=Path)
-    a=p.parse_args();torch.set_num_threads(1)
-    if a.num_envs<1 or a.steps<1 or not 0<=a.count<=8:p.error('Invalid count or steps')
+    add_scene_arguments(p)
+    a=p.parse_args()
+    cfg=Config()
+    try:apply_scene_arguments(cfg,a)
+    except ValueError as exc:p.error(str(exc))
+    torch.set_num_threads(1)
+    if a.num_envs<1 or a.steps<1 or not 0<=a.count<=cfg.max_obstacles:p.error('Invalid count or steps')
     if a.backend=='warp':torch.cuda.reset_peak_memory_stats()
-    start=time.monotonic();e=AvoidanceEnv(a.num_envs,a.backend)
+    start=time.monotonic();e=AvoidanceEnv(a.num_envs,a.backend,cfg)
     e.reset(seeds=list(range(9_000_000,9_000_000+a.num_envs)),speeds=[a.speed]*a.num_envs,
             count=a.count,directions=[0.]*a.num_envs)
     initialized=time.monotonic();failures=[]

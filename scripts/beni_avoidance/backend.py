@@ -3,15 +3,17 @@ import numpy as np
 import torch
 import mujoco
 from .world import model as build_world
+from .common import Config
 
 
 class Native:
-    def __init__(self,n):
-        self.model=build_world();self.n=n;self.device='cpu'
+    def __init__(self,n,cfg=None):
+        cfg=cfg or Config()
+        self.model=build_world(cfg);self.n=n;self.device='cpu'
         self.datas=[mujoco.MjData(self.model) for _ in range(n)]
         self.qpos=torch.zeros(n,self.model.nq);self.qvel=torch.zeros(n,self.model.nv)
         self.sensor=torch.zeros(n,self.model.nsensordata);self.ctrl=torch.zeros(n,self.model.nu)
-        self.obstacle_ids=set(self.model.geom(f'obstacle_geom_{i}').id for i in range(8))
+        self.obstacle_ids=set(self.model.geom(f'obstacle_geom_{i}').id for i in range(cfg.max_obstacles))
         self.robot_ids={i for i in range(self.model.ngeom) if self.model.geom_bodyid[i]>0 and i not in self.obstacle_ids}
         self.wheel_ids={self.model.geom(f'{n}_collision').id for n in ('LW','RW')}
         self.floor=self.model.geom('floor').id
@@ -45,12 +47,13 @@ class Native:
 
 
 class Warp:
-    def __init__(self,n):
+    def __init__(self,n,cfg=None):
+        cfg=cfg or Config()
         import warp as wp
         import mujoco_warp as mw
         from .warp_contacts import detect_contacts
         if not torch.cuda.is_available():raise RuntimeError('CUDA is unavailable; use --backend native for CPU debugging')
-        self.wp,self.mw=wp,mw;self.device='cuda:0';self.n=n;self.model=build_world()
+        self.wp,self.mw=wp,mw;self.device='cuda:0';self.n=n;self.model=build_world(cfg)
         wp.init();wp.set_device(self.device)
         self.stream=torch.cuda.Stream()
         torch.cuda.set_stream(self.stream)
@@ -63,7 +66,7 @@ class Warp:
         self.reset_mask=torch.zeros(n,device=self.device,dtype=torch.bool)
         self.reset_wp=wp.from_torch(self.reset_mask,dtype=wp.bool)
         kind=np.zeros(self.model.ngeom,np.int32)
-        obstacle_ids=[self.model.geom(f'obstacle_geom_{i}').id for i in range(8)]
+        obstacle_ids=[self.model.geom(f'obstacle_geom_{i}').id for i in range(cfg.max_obstacles)]
         kind[self.model.geom_bodyid>0]=1;kind[obstacle_ids]=2
         for name in ('LW','RW'):kind[self.model.geom(f'{name}_collision').id]=3
         kind[self.model.geom('floor').id]=4

@@ -10,24 +10,60 @@ from play_native import ACTION, OBS, DEFAULT, ROOT, Policy, motor_config
 
 @dataclass
 class Config:
+    version: int = 2
+    boundary_margin: float = .35
+    boundary_weight: float = .2
     rays: int = 36
     ray_range: float = 2.
     stack: int = 3
     upper_dt: float = .1
     target_distance: float = 3.
+    back_margin: float = .4
+    max_obstacles: int = 8
+    obstacle_start: float = .85
+    obstacle_end_margin: float = .25
+    obstacle_side_margin: float = .45
+    route_resolution: float = .1
+    route_padding: float = .05
+    timeout_factor: float = 2.
+    timeout_extra: float = 5.
+    stop_timeout: float = 5.
     half_width: float = 1.5
     yaw_limit: float = 1.
     delay: int = 2
     seed: int = 42
     bottom: str = str(ROOT / 'assets/models/policy.pt')
     safety_radius: float = .19
+    @classmethod
+    def from_checkpoint(cls, values):
+        values=dict(values)
+        values.setdefault("version",1)
+        return cls(**values)
+
     def validate(self):
+        if self.version not in (1,2) or self.boundary_margin<=0 or self.boundary_weight<0:
+            raise ValueError("Invalid observation/reward version or boundary settings")
         if self.rays != 36 or self.stack != 3 or self.upper_dt != .1:
             raise ValueError('Current deployment contract is 36 rays / 3 frames / 10 Hz')
         if not 2 <= self.delay <= 5 or not 0 < self.yaw_limit <= 1 or self.half_width <= .5:
             raise ValueError('Invalid delay, yaw limit or field width')
+        import math
+        numeric=(self.target_distance,self.half_width,self.back_margin,self.obstacle_start,
+                 self.obstacle_end_margin,self.obstacle_side_margin,self.route_resolution,self.route_padding,
+                 self.timeout_factor,self.timeout_extra,self.stop_timeout,self.safety_radius)
+        if not all(math.isfinite(x) for x in numeric):raise ValueError('Scene parameters must be finite')
+        if (self.target_distance<=0 or self.back_margin<.1 or self.safety_radius<=0
+            or self.half_width<=self.safety_radius or not 8<=self.max_obstacles<=128
+            or self.obstacle_start<self.safety_radius+.3 or self.obstacle_end_margin<.22
+            or self.obstacle_start>=self.target_distance-self.obstacle_end_margin
+            or not .22<=self.obstacle_side_margin<self.half_width
+            or not .02<=self.route_resolution<=.2 or self.back_margin<self.route_resolution or self.route_padding<0
+            or self.timeout_factor<=0 or self.timeout_extra<0 or self.stop_timeout<=0):
+            raise ValueError('Invalid scene dimensions, spawn margins, obstacle capacity, grid or timeout')
+        cells=(self.target_distance+self.back_margin+.2)/self.route_resolution * (2*self.half_width/self.route_resolution)
+        if cells>2_000_000:raise ValueError('Route grid exceeds 2 million cells; increase route resolution')
     @property
-    def frame_dim(self): return self.rays + 9
+    def frame_dim(self): return self.rays + 9 + (4 if self.version==2 else 0)
     @property
     def obs_dim(self): return self.frame_dim * self.stack
     def dict(self): return asdict(self)

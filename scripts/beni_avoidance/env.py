@@ -2,7 +2,7 @@
 import numpy as np
 import torch
 from .common import Config, Bottom, Motors, low_observation, heading, rotate_xy, wrap, rays, clearance
-from .world import SIZES, KINDS, layout
+from .world import catalogue, layout
 from .backend import Native, Warp
 from play_native import DEFAULT
 
@@ -10,14 +10,15 @@ from play_native import DEFAULT
 class AvoidanceEnv:
     def __init__(self,n=1,backend='native',cfg=None):
         self.cfg=cfg or Config();self.cfg.validate()
-        self.backend=Native(n) if backend=='native' else Warp(n)
+        self.backend=Native(n,self.cfg) if backend=='native' else Warp(n,self.cfg)
         self.device=self.backend.device;self.n=n;self.model=self.backend.model
         self.rng=np.random.default_rng(self.cfg.seed)
         self.bottom=Bottom(self.cfg.bottom,n,self.device)
         self.motors=Motors(self.model,n,self.device,self.cfg.delay)
-        self.sizes=torch.tensor(SIZES,device=self.device);self.kinds=torch.tensor(KINDS,device=self.device)
+        sizes,kinds=catalogue(self.cfg.max_obstacles)
+        self.sizes=torch.tensor(sizes,device=self.device);self.kinds=torch.tensor(kinds,device=self.device)
         def zeros(*shape):return torch.zeros(n,*shape,device=self.device)
-        self.centers=zeros(8,2);self.active=zeros(8).bool()
+        self.centers=zeros(self.cfg.max_obstacles,2);self.active=zeros(self.cfg.max_obstacles).bool()
         self.desired=zeros();self.speed=zeros();self.command=zeros(2);self.previous=zeros(2)
         self.last=zeros(7);self.frames=zeros(self.cfg.stack,self.cfg.frame_dim)
         self.steps=zeros().long();self.progress=zeros();self.previous_progress=zeros()
@@ -34,11 +35,12 @@ class AvoidanceEnv:
         if not number:return self.observation()
         if seeds is None:seeds=self.rng.integers(0,1_000_000,size=number)
         if speeds is None:
-            speeds=self.rng.uniform(.1,.5,number);speeds[self.rng.random(number)<.1]=0
+            speeds=self.rng.uniform(.1,.5,number)
+            if self.cfg.version==1:speeds[self.rng.random(number)<.1]=0
         if directions is None:directions=self.rng.uniform(-np.pi,np.pi,number)
         if np.any(np.asarray(speeds)<0) or np.any(np.asarray(speeds)>.5):raise ValueError('Target speed must be in [0,.5]')
-        counts=[count if count is not None else (0 if self.stage==0 else int(self.rng.integers(1,3)) if self.stage==1 else int(self.rng.integers(3,9))) for _ in range(number)]
-        layouts=[layout(int(seed),c,self.cfg.safety_radius,self.cfg.half_width) for seed,c in zip(seeds,counts)]
+        counts=[count if count is not None else (0 if self.stage==0 else int(self.rng.integers(1,3)) if self.stage==1 else int(self.rng.integers(3,self.cfg.max_obstacles+1))) for _ in range(number)]
+        layouts=[layout(int(seed),c,cfg=self.cfg) for seed,c in zip(seeds,counts)]
         self.centers[ids]=torch.tensor(np.stack([x[0] for x in layouts]),device=self.device)
         self.active[ids]=torch.tensor(np.stack([x[1] for x in layouts]),device=self.device)
         self.desired[ids]=torch.as_tensor(directions,device=self.device,dtype=torch.float32)
@@ -47,11 +49,14 @@ class AvoidanceEnv:
         q=torch.zeros(number,self.model.nq,device=self.device);q[:,2]=.14
         q[:,3]=(self.desired[ids]/2).cos();q[:,6]=(self.desired[ids]/2).sin()
         for name,value in DEFAULT.items():q[:,self.model.joint(name).qposadr[0]]=value
-        mocap=torch.zeros(number,8,3,device=self.device);mocap[:,:,2]=.3
+        mocap=torch.zeros(number,self.cfg.max_obstacles,3,device=self.device);mocap[:,:,2]=.3
         centers=self.centers[ids].clone()
-        centers[~self.active[ids]]=torch.tensor([20.,20.],device=self.device)
+        parking=torch.zeros_like(centers)
+        parking[:,:,0]=self.cfg.target_distance+20.+2*torch.arange(self.cfg.max_obstacles,device=self.device)
+        parking[:,:,1]=self.cfg.half_width+20.
+        centers=torch.where(self.active[ids,:,None],centers,parking)
         mocap[:,:,:2]=rotate_xy(centers,self.desired[ids,None])
-        quat=torch.zeros(number,8,4,device=self.device)
+        quat=torch.zeros(number,self.cfg.max_obstacles,4,device=self.device)
         quat[:,:,0]=(self.desired[ids,None]/2).cos();quat[:,:,3]=(self.desired[ids,None]/2).sin()
         self.backend.reset(ids,q,mocap,quat)
         self.bottom.reset(ids);self.motors.reset(ids)
@@ -82,6 +87,14 @@ class AvoidanceEnv:
         w,x,y,z=q[:,3:7].unbind(-1)
         extra=torch.stack((relative.sin(),relative.cos(),speed/.5,wz,
                           2*(w*y-x*z),-2*(y*z+w*x),self.speed/.5,self.command[:,0]/.5,self.command[:,1]),-1)
+        if self.cfg.version==2:
+            # Distances to virtual task limits, not obstacle ground-truth poses.
+            lateral=self.cfg.half_width-self.cfg.safety_radius
+            navigation=torch.stack(((lateral-pos[:,1])/(2*lateral),
+                                    (lateral+pos[:,1])/(2*lateral),
+                                    (pos[:,0]+self.cfg.back_margin)/(self.cfg.target_distance+self.cfg.back_margin),
+                                    (self.cfg.target_distance-pos[:,0])/self.cfg.target_distance),-1)
+            extra=torch.cat((extra,navigation),-1)
         return torch.cat((scan/self.cfg.ray_range,extra),-1)
     def observation(self):return self.frames.flatten(1).clone()
 
@@ -114,32 +127,35 @@ class AvoidanceEnv:
         collision=self.backend.collision
         finite=torch.isfinite(self.backend.qpos).all(-1)&torch.isfinite(self.backend.qvel).all(-1)
         fall=((tilt>np.pi/3)|(self.backend.qpos[:,2]<.055)|self.backend.ground_hit|~finite)&~warmup
-        bounds=((pos[:,1].abs()>self.cfg.half_width-self.cfg.safety_radius)|(pos[:,0]<-.4))&~warmup
+        bounds=((pos[:,1].abs()>self.cfg.half_width-self.cfg.safety_radius)|(pos[:,0]<-self.cfg.back_margin))&~warmup
         idx=(self.steps.clamp_min(0)%50).long();rows=torch.arange(self.n,device=self.device)
         old=self.progress_ring[rows,idx].clone();self.progress_ring[rows,idx]=self.progress
         stall=(self.steps>=50)&(self.speed>0)&((self.progress-old)<.05)
         zero=self.speed==0
-        timeout=self.steps*.1 >= torch.where(zero,torch.full_like(self.speed,5.),6/self.speed.clamp_min(.01)+5)
+        timeout=self.steps*.1 >= torch.where(zero,torch.full_like(self.speed,self.cfg.stop_timeout),self.cfg.timeout_factor*self.cfg.target_distance/self.speed.clamp_min(.01)+self.cfg.timeout_extra)
         success=((self.progress>=self.cfg.target_distance)&~zero)|(zero&timeout&(pos.norm(dim=-1)<.15)&(speed.abs()<.1))
         failure=collision|fall|bounds|stall
         success &= ~failure
         terminated=failure|success
         truncated=timeout&~terminated
         done=terminated|truncated
-        # Expose the exact weighted contributions without changing the objective.
+        # Account for each weighted contribution under the checkpoint task version.
         moving=(~zero)&(~warmup)
         terms={
-            'progress':2*delta/(self.speed*.1+.01),
+            'progress':(2 if self.cfg.version==1 else .5)*delta/(self.speed*.1+.01),
             'speed_tracking':-.05*(speed-self.speed).abs()/.5,
             'heading':-.03*relative.abs(),
             'proximity':-.15*((.25-gap)/.25).clamp(0,2),
             'command_smoothness':-.05*(self.command-before).square().sum(-1),
         }
+        if self.cfg.version==2:
+            margin=torch.minimum(self.cfg.half_width-self.cfg.safety_radius-pos[:,1].abs(),pos[:,0]+self.cfg.back_margin)
+            terms['boundary']=-self.cfg.boundary_weight*((self.cfg.boundary_margin-margin)/self.cfg.boundary_margin).clamp(0,1).square()
         terms={k:torch.where(moving,v,0.) for k,v in terms.items()}
         terms.update(stop_speed=torch.where(zero&~warmup,-.1*speed.abs(),0.),
                      stop_drift=torch.where(zero&~warmup,-.2*pos.norm(dim=-1),0.))
-        for name,value in dict(success=10*success,collision=-30*collision,fall=-20*fall,
-                               bounds=-10*bounds,stall=-5*stall,timeout=-5*truncated).items():
+        for name,value in dict(success=(10 if self.cfg.version==1 else 20)*success,collision=-30*collision,fall=-20*fall,
+                               bounds=(-10 if self.cfg.version==1 else -20)*bounds,stall=-5*stall,timeout=-5*truncated).items():
             terms[name]=torch.where(~warmup,value,0.).float()
         raw=sum(terms.values())
         reward=torch.nan_to_num(raw,nan=-30.,posinf=-30.,neginf=-30.)

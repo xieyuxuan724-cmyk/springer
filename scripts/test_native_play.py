@@ -48,16 +48,15 @@ class NativePlaybackTests(unittest.TestCase):
 
     def test_model_observation_and_reset(self):
         sim = Simulation(self.pt)
-        np.testing.assert_array_equal(sim.model.geom('floor').size[:2], [20., 20.])
+        np.testing.assert_array_equal(sim.model.geom('floor').size[:2], [0., 0.])
         self.assertEqual((sim.model.nq, sim.model.nv, sim.model.nu), (15, 14, 8))
         for name in DEFAULT:
             self.assertEqual(sim.model.qpos0[sim.joints[name][0]], 0.)
         sim.data.qpos[:2] = [100.13, -80.17]
-        sim.update_ground()
-        np.testing.assert_allclose(sim.model.geom('floor').pos[:2], [100., -80.5])
         import mujoco
         mujoco.mj_forward(sim.model, sim.data)
-        np.testing.assert_allclose(sim.data.geom_xpos[sim.model.geom('floor').id, :2], [100., -80.5])
+        np.testing.assert_array_equal(sim.model.geom('floor').pos[:2], [0., 0.])
+        np.testing.assert_array_equal(sim.data.geom_xpos[sim.model.geom('floor').id, :2], [0., 0.])
         sim.reset()
         np.testing.assert_array_equal(sim.model.geom('floor').pos[:2], [0., 0.])
         obs = sim.observation()
